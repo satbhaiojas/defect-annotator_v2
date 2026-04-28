@@ -1,1 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Defect Annotator v3</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#1a1a2e;color:#eee;font-family:Arial,sans-serif;
+     display:flex;flex-direction:column;align-items:center;padding:8px;min-height:100vh}
+h2{color:#a8d8ea;margin:6px 0;font-size:17px}
+.bar{display:flex;gap:7px;align-items:center;padding:7px 12px;
+     background:#16213e;border-radius:7px;margin-bottom:5px;
+     flex-wrap:wrap;max-width:1200px;width:100%}
+.btn{padding:5px 13px;border:2px solid transparent;border-radius:5px;
+     cursor:pointer;font-size:12px;font-weight:bold}
+.act{outline:3px solid #fff}
+#bCrack{background:#ff3333;color:#fff}
+#bPore {background:#3355ff;color:#fff}
+#bMacro{background:#ff8800;color:#fff}
+#bSplat{background:#ffdd00;color:#222}
+#bBg   {background:#33bb33;color:#222}
+#bErase{background:#888;color:#fff}
+#wrap{position:relative;max-width:1200px;width:100%;border:2px dashed #334;
+      min-height:200px;display:flex;align-items:center;justify-content:center}
+#placeholder{color:#556;font-size:16px;pointer-events:none}
+#bc{display:block;max-width:100%}
+#dc{position:absolute;top:0;left:0;cursor:crosshair;max-width:100%}
+input[type=file]{color:#eee;font-size:13px;background:#0d1b2a;
+  border:2px dashed #a8d8ea;padding:6px 10px;border-radius:6px;cursor:pointer}
+input[type=text],input[type=number]{background:#16213e;color:#eee;
+  border:1px solid #557;padding:4px 6px;border-radius:4px;font-size:12px}
+#expBtn{background:#0f3460;color:#a8d8ea;border:1px solid #a8d8ea;
+  padding:7px 18px;font-size:13px;border-radius:6px;cursor:pointer;margin:6px 4px}
+#expBtn:hover{background:#a8d8ea;color:#0f3460}
+.leg{display:inline-flex;align-items:center;gap:4px;font-size:11px}
+.dot{width:12px;height:12px;border-radius:3px;display:inline-block}
+#dropzone{width:100%;text-align:center;padding:30px;color:#557;font-size:15px}
+</style>
+</head>
+<body>
+<h2>&#128300; Expert Defect Annotator v3 &#8212; 5 Classes</h2>
 
+<!-- Student info -->
+<div class="bar" style="background:#0d1b2a;border:1px solid #a8d8ea55">
+  <b style="color:#a8d8ea">&#128100; Annotator:</b>
+  <label>Name:<input type="text" id="sname" placeholder="Your name" style="width:130px;margin-left:4px"></label>
+  <label>ID:<input type="text" id="sid" placeholder="Roll/ID" style="width:90px;margin-left:4px"></label>
+  <label>Image:<input type="text" id="asgn" placeholder="e.g. T4-L1.1" style="width:90px;margin-left:4px"></label>
+</div>
+
+<!-- Load image -->
+<div class="bar">
+  <b style="color:#a8d8ea">&#128194; Load Image:</b>
+  <input type="file" id="upld" accept="image/jpeg,image/png,image/bmp,image/tiff,image/*">
+  <label style="margin-left:6px">px/mm:
+    <input type="number" id="pmm" value="126" style="width:58px;margin-left:4px"
+      onchange="pmm=+this.value;if(lastImg){resize(natW,natH);drawBase()}">
+  </label>
+  <button class="btn" style="background:#226655;color:#eee;font-size:11px"
+    onclick="autoScale()">&#128269; Auto-detect scale</button>
+  <span id="iinfo" style="color:#aaa;font-size:11px"></span>
+  <button class="btn" style="background:#225522;color:#eee;font-size:11px"
+    onclick="showGrid=!showGrid;drawBase()">&#8862; Grid</button>
+</div>
+
+<!-- Brush tools -->
+<div class="bar">
+  <b style="color:#ccc;font-size:11px">LABEL:</b>
+  <button class="btn act" id="bCrack" onclick="setT('crack','#ff3333','bCrack')">&#128308; Crack</button>
+  <button class="btn"     id="bPore"  onclick="setT('pore','#3355ff','bPore')">&#128309; Micro-pore</button>
+  <button class="btn"     id="bMacro" onclick="setT('macro','#ff8800','bMacro')">&#128992; Macro-porosity</button>
+  <button class="btn"     id="bSplat" onclick="setT('splat','#ffdd00','bSplat')">&#128993; Splatter</button>
+  <button class="btn"     id="bBg"    onclick="setT('bg','#33bb33','bBg')">&#128994; Background</button>
+  <button class="btn"     id="bErase" onclick="setT('erase','#000','bErase')">&#9711; Erase</button>
+  <label style="font-size:12px">Brush:
+    <input type="range" id="bsz" min="2" max="80" value="8"
+      oninput="bp=+this.value;document.getElementById('bszv').textContent=this.value">
+    <span id="bszv">8</span>px
+  </label>
+  <button class="btn" style="background:#555" onclick="undoLast()">&#8617; Undo</button>
+  <button class="btn" style="background:#c0392b;color:#fff" onclick="clearAll()">&#128465; Clear</button>
+</div>
+
+<!-- Status bar -->
+<div class="bar" style="background:#0d1117">
+  <span id="st" style="font-size:12px;color:#ccc">Load an image to begin</span>
+  <span id="xy" style="font-size:11px;color:#88ccff;margin-left:12px"></span>
+  <label style="margin-left:auto;font-size:12px;color:#aaa">Opacity:
+    <input type="range" min="10" max="90" value="55" id="opsl"
+      oninput="oa=+this.value/100;document.getElementById('opv').textContent=this.value;redrawOverlay()">
+    <span id="opv">55</span>%
+  </label>
+</div>
+
+<!-- Canvas area -->
+<div id="wrap">
+  <div id="dropzone" id="placeholder">
+    &#8593; Click "Load Image" above to open your microscopy image
+  </div>
+  <canvas id="bc" style="display:none"></canvas>
+  <canvas id="dc" style="display:none"></canvas>
+</div>
+
+<!-- Legend -->
+<div class="bar" style="background:#0d1117;font-size:11px;margin-top:4px">
+  <b style="color:#ccc">Legend:</b>
+  <span class="leg"><span class="dot" style="background:#ff3333"></span>Crack &#8212; thin dark linear discontinuity</span>
+  <span class="leg"><span class="dot" style="background:#3355ff"></span>Micro-pore &#8212; small circular void &lt;100&#181;m</span>
+  <span class="leg"><span class="dot" style="background:#ff8800"></span>Macro-porosity &#8212; large irregular pore &gt;100&#181;m</span>
+  <span class="leg"><span class="dot" style="background:#ffdd00"></span>Splatter &#8212; bright isolated deposit</span>
+  <span class="leg"><span class="dot" style="background:#33bb33"></span>Background &#8212; normal matrix</span>
+</div>
+
+<div style="font-size:11px;color:#557;margin:4px 0;max-width:1200px;width:100%">
+  Tip: Paint a few strokes of EACH class present in the image. Use larger brush for macro-porosity.
+  Export JSON and send back to instructor for ML training.
+</div>
+
+<div>
+  <button id="expBtn" onclick="exportJSON()">&#128190; Export Annotations (JSON)</button>
+</div>
+
+<script>
+// ---- State ----
+var tool='crack', tc='#ff3333', bp=8, painting=false;
+var strokes=[], curStroke=null;
+var cnt={crack:0,pore:0,macro:0,splat:0,bg:0};
+var natW=0, natH=0, dW=0, dH=0, sc=1;
+var pmm=126, imgName='unknown', lastImg=null;
+var showGrid=true, oa=0.55;
+
+var bcEl=document.getElementById('bc');
+var dcEl=document.getElementById('dc');
+var bx=bcEl.getContext('2d');
+var dx=dcEl.getContext('2d');
+var offC=document.createElement('canvas');
+var ox=offC.getContext('2d');
+
+// ---- File input (the ONLY way to load) ----
+document.getElementById('upld').addEventListener('change', function(){
+  var file=this.files[0];
+  if(!file){ alert('No file selected'); return; }
+  imgName=file.name;
+  document.getElementById('asgn').value=file.name.replace(/\.[^/.]+$/,'');
+  var url=URL.createObjectURL(file);
+  var img=new Image();
+  img.onload=function(){
+    lastImg=img;
+    strokes=[]; cnt={crack:0,pore:0,macro:0,splat:0,bg:0}; updStatus();
+    resize(img.naturalWidth, img.naturalHeight);
+    drawBase();
+    dx.clearRect(0,0,dW,dH);
+    document.getElementById('dropzone').style.display='none';
+    bcEl.style.display='block';
+    dcEl.style.display='block';
+    URL.revokeObjectURL(url);
+  };
+  img.onerror=function(){ alert('Failed to load image. Try a JPG or PNG file.'); };
+  img.src=url;
+  this.value=''; // allow re-selecting same file
+});
+
+function resize(nw,nh){
+  pmm=+document.getElementById('pmm').value||126;
+  var maxW=Math.min(1180, window.innerWidth-24);
+  sc=maxW/nw;
+  dW=Math.round(nw*sc); dH=Math.round(nh*sc);
+  natW=nw; natH=nh;
+  bcEl.width=dW; bcEl.height=dH;
+  dcEl.width=dW; dcEl.height=dH;
+  offC.width=nw; offC.height=nh;
+  document.getElementById('iinfo').textContent=
+    nw+'x'+nh+' px  |  '+(nw/pmm).toFixed(1)+'x'+(nh/pmm).toFixed(1)+' mm';
+}
+
+function drawBase(){
+  if(!lastImg) return;
+  bx.clearRect(0,0,dW,dH);
+  bx.drawImage(lastImg,0,0,dW,dH);
+  if(!showGrid) return;
+  bx.save();
+  bx.strokeStyle='rgba(255,255,0,0.3)';
+  bx.lineWidth=1;
+  bx.fillStyle='rgba(255,255,0,0.8)';
+  var fs=Math.max(9,Math.round(11*sc));
+  bx.font=fs+'px Arial';
+  for(var m=1; m*pmm*sc < dW+pmm*sc; m++){
+    var x=m*pmm*sc;
+    bx.beginPath(); bx.moveTo(x,0); bx.lineTo(x,dH); bx.stroke();
+    bx.fillText(m+'mm', x+2, fs+2);
+  }
+  for(var m=1; m*pmm*sc < dH+pmm*sc; m++){
+    var y=m*pmm*sc;
+    bx.beginPath(); bx.moveTo(0,y); bx.lineTo(dW,y); bx.stroke();
+    bx.fillText(m+'mm', 2, y-2);
+  }
+  bx.restore();
+}
+
+// ---- Auto scale detection ----
+function autoScale(){
+  if(!lastImg){ alert('Load an image first!'); return; }
+  var tmp=document.createElement('canvas');
+  tmp.width=natW; tmp.height=80;
+  var tx=tmp.getContext('2d');
+  tx.drawImage(lastImg, 0, natH-80, natW, 80, 0, 0, natW, 80);
+  var d=tx.getImageData(0,0,natW,80).data;
+  var redCols=[];
+  for(var x=0;x<natW;x++){
+    for(var y=0;y<80;y++){
+      var i=(y*natW+x)*4, r=d[i], g=d[i+1], b=d[i+2];
+      if(r>150 && g<80 && b<80){ redCols.push(x); break; }
+    }
+  }
+  if(redCols.length>5){
+    var x0=redCols[0], x1=redCols[redCols.length-1];
+    var det=x1-x0;
+    document.getElementById('pmm').value=det;
+    pmm=det;
+    resize(natW,natH); drawBase();
+    alert('Detected: '+det+' px = 1 mm');
+  } else {
+    alert('Red scale bar not found. Enter px/mm manually.');
+  }
+}
+
+// ---- Drawing ----
+function getPos(e){
+  var r=dcEl.getBoundingClientRect();
+  var cx=(e.clientX-r.left)*(dW/r.width);
+  var cy=(e.clientY-r.top)*(dH/r.height);
+  return{cx:cx, cy:cy, rx:cx/sc, ry:cy/sc};
+}
+
+function paintDot(cx,cy,rx,ry){
+  var r=bp/2;
+  dx.globalAlpha=(tool==='erase')?1.0:oa;
+  dx.globalCompositeOperation=(tool==='erase')?'destination-out':'source-over';
+  dx.fillStyle=tc;
+  dx.beginPath(); dx.arc(cx,cy,r,0,Math.PI*2); dx.fill();
+  dx.globalAlpha=1; dx.globalCompositeOperation='source-over';
+  var rr=Math.max(1, Math.round(r/sc));
+  ox.globalCompositeOperation=(tool==='erase')?'destination-out':'source-over';
+  ox.fillStyle=tc;
+  ox.beginPath(); ox.arc(rx,ry,rr,0,Math.PI*2); ox.fill();
+  ox.globalCompositeOperation='source-over';
+}
+
+dcEl.addEventListener('mousedown',function(e){
+  if(!natW) return;
+  painting=true;
+  var p=getPos(e);
+  curStroke={label:tool,color:tc,brush:bp,points:[[Math.round(p.rx),Math.round(p.ry)]]};
+  paintDot(p.cx,p.cy,p.rx,p.ry);
+});
+dcEl.addEventListener('mousemove',function(e){
+  var p=getPos(e);
+  if(natW){
+    document.getElementById('xy').textContent=
+      'x='+(p.rx/pmm).toFixed(2)+'mm  y='+(p.ry/pmm).toFixed(2)+'mm';
+  }
+  if(!painting) return;
+  curStroke.points.push([Math.round(p.rx),Math.round(p.ry)]);
+  paintDot(p.cx,p.cy,p.rx,p.ry);
+});
+dcEl.addEventListener('mouseup',function(){
+  if(curStroke && tool!=='erase'){
+    strokes.push(curStroke);
+    if(cnt[tool]!==undefined) cnt[tool]++;
+    updStatus();
+  }
+  painting=false; curStroke=null;
+});
+dcEl.addEventListener('mouseleave',function(){ painting=false; curStroke=null; });
+
+// Touch
+function toMouse(type,touch){
+  dcEl.dispatchEvent(new MouseEvent(type,{clientX:touch.clientX,clientY:touch.clientY,bubbles:true}));
+}
+dcEl.addEventListener('touchstart', function(e){e.preventDefault();toMouse('mousedown',e.touches[0]);},{passive:false});
+dcEl.addEventListener('touchmove',  function(e){e.preventDefault();toMouse('mousemove',e.touches[0]);},{passive:false});
+dcEl.addEventListener('touchend',   function(e){e.preventDefault();dcEl.dispatchEvent(new MouseEvent('mouseup',{}));},{passive:false});
+
+function redrawOverlay(){
+  document.getElementById('opv').textContent=Math.round(oa*100);
+  dx.clearRect(0,0,dW,dH);
+  strokes.forEach(function(s){
+    var r=s.brush/2;
+    s.points.forEach(function(pt){
+      dx.globalAlpha=oa; dx.fillStyle=s.color;
+      dx.beginPath(); dx.arc(pt[0]*sc,pt[1]*sc,r,0,Math.PI*2); dx.fill();
+    });
+  });
+  dx.globalAlpha=1;
+}
+
+function undoLast(){
+  if(!strokes.length) return;
+  var last=strokes.pop();
+  if(cnt[last.label]!==undefined) cnt[last.label]=Math.max(0,cnt[last.label]-1);
+  // Redraw offscreen
+  ox.clearRect(0,0,natW,natH);
+  strokes.forEach(function(s){
+    var rr=Math.max(1,Math.round(s.brush/2/sc));
+    s.points.forEach(function(pt){
+      ox.fillStyle=s.color;
+      ox.beginPath(); ox.arc(pt[0],pt[1],rr,0,Math.PI*2); ox.fill();
+    });
+  });
+  redrawOverlay(); updStatus();
+}
+
+function clearAll(){
+  if(!confirm('Clear all annotations on this image?')) return;
+  strokes=[]; cnt={crack:0,pore:0,macro:0,splat:0,bg:0};
+  dx.clearRect(0,0,dW,dH);
+  ox.clearRect(0,0,natW,natH);
+  updStatus();
+}
+
+function updStatus(){
+  document.getElementById('st').textContent=
+    'Strokes: '+strokes.length+
+    ' | Crack:'+cnt.crack+
+    ' Micro-pore:'+cnt.pore+
+    ' Macro-pore:'+cnt.macro+
+    ' Splatter:'+cnt.splat+
+    ' BG:'+cnt.bg;
+}
+
+function setT(t,c,bid){
+  tool=t; tc=c;
+  ['bCrack','bPore','bMacro','bSplat','bBg','bErase'].forEach(function(id){
+    document.getElementById(id).classList.remove('act');
+  });
+  document.getElementById(bid).classList.add('act');
+}
+
+function exportJSON(){
+  if(!strokes.length){ alert('No annotations yet!'); return; }
+  var data={
+    annotator:{
+      name: document.getElementById('sname').value||'unknown',
+      id:   document.getElementById('sid').value||'',
+      assigned_image: document.getElementById('asgn').value||imgName
+    },
+    image: imgName,
+    img_width: natW, img_height: natH,
+    px_per_mm: +document.getElementById('pmm').value||pmm,
+    stroke_summary: JSON.parse(JSON.stringify(cnt)),
+    strokes: strokes.map(function(s){
+      return{label:s.label, color:s.color, brush_px:s.brush, points:s.points};
+    })
+  };
+  var blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  var a=document.createElement('a');
+  var nm=imgName.replace(/\.[^/.]+$/,'')||'img';
+  var sn=(document.getElementById('sname').value||'annotator').replace(/\s+/g,'_');
+  a.href=URL.createObjectURL(blob);
+  a.download=nm+'_'+sn+'_annotations.json';
+  a.click();
+  setTimeout(function(){URL.revokeObjectURL(a.href);},1000);
+  alert('Exported! Please send the JSON file back to your instructor.');
+}
+</script>
+</body>
+</html>
